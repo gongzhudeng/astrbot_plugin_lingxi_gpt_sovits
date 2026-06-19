@@ -312,7 +312,7 @@
                 "type": "string",
                 "hint": "决定对哪个粒度的文本计算情绪。按标点/句子模式仅支持 WAV 格式，其他格式自动降级为整段",
                 "options": ["whole", "punctuation", "sentence"],
-                "labels": ["整段话", "按标点切割（每段独立情绪）", "按句子分组（句号为句）"],
+                "labels": ["整段话", "按标点切割（每段独立情绪）", "按句子分组（句号/问号/感叹号为句）"],
                 "default": "whole"
             },
             "sentence_group_size": {

@@ -19,7 +19,7 @@ def _split_by_punctuation(text: str) -> list[str]:
 
 
 def _split_by_sentence(text: str, group_size: int) -> list[str]:
-    sentences = [s.strip() for s in re.split(r"[。.]", text) if s.strip()]
+    sentences = [s.strip() for s in re.split(r"[。.？?！!]", text) if s.strip()]
     return [
         "。".join(sentences[i : i + group_size])
         for i in range(0, len(sentences), group_size)
