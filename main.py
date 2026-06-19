@@ -61,8 +61,6 @@ class GPTSoVITSPlugin(Star):
 
     async def initialize(self):
         if self.cfg.enabled:
-            if self.cfg.active_profile:
-                self._apply_profile(self.cfg.active_profile)
             await self.service.load_model()
 
     async def terminate(self):
