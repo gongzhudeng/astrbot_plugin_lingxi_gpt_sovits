@@ -40,6 +40,20 @@ class GPTSoVITSService:
             else:
                 logger.error(f"SoVITS 模型加载失败: {result.error}")
 
+    async def inference_raw(
+        self,
+        text: str,
+        extra_params: dict[str, Any] | None = None,
+    ) -> GSVRequestResult:
+        """TTS inference without cache read/write (used for segment merging)."""
+        params = self.default_params.copy()
+        if text:
+            params["text"] = text
+        if extra_params:
+            params.update({k: v for k, v in extra_params.items() if k in params})
+        logger.debug(f"向 GSV 发起 TTS 请求（无缓存），参数: {params}")
+        return await self.client.tts(params)
+
     async def inference(
         self,
         text: str,

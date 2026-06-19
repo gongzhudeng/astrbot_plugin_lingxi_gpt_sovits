@@ -145,16 +145,21 @@ class GPTSoVITSPlugin(Star):
             for seg in segments:
                 event.set_extra("emotion", None)  # clear cache per segment
                 params = await self._get_emotion_params(event, seg)
-                res = await self.service.inference(seg, extra_params=params)
+                res = await self.service.inference_raw(seg, extra_params=params)
                 if not bool(res) or not res.data:
                     return res
                 chunks.append(res.data)
 
             try:
                 merged = _merge_wav_bytes(chunks)
-                b64 = base64.urlsafe_b64encode(merged).decode()
-                # Return a synthetic result carrying the merged audio
-                return GSVRequestResult(ok=True, data=merged, text=text, file_path="")
+                cache_params = {**self.service.default_params, "text": text}
+                cache_path = self.local_data.save_audio(merged, cache_params)
+                return GSVRequestResult(
+                    ok=True,
+                    data=merged,
+                    text=text,
+                    file_path=str(cache_path) if cache_path else "",
+                )
             except Exception as e:
                 logger.warning(f"WAV 合并失败，降级整段推理: {e}")
 
