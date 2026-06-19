@@ -1,0 +1,27 @@
+name: 灵犀 · GPT-SoVITS 语音合成
+desc: 对接本地部署的GPT_SoVITS,为astrbot提供文本转语音(TTS)服务，支持自定义音色和情绪
+help: |
+  GPT-SoVITS 语音合成插件会调用本地部署的 GPT-SoVITS API，
+  将文本转换为语音输出，支持自定义音色和情绪参数。
+
+  主要功能：
+  - 支持手动触发语音合成
+  - 支持自动转语音（按概率）
+  - 支持 LLM 工具调用
+  - 支持情绪参数切换
+  - 支持音频缓存
+  - 支持多种音频格式（wav/mp3/ogg）
+
+  常用命令：
+  说 <文本> - 手动触发 TTS
+  gsv <文本> - 手动触发 TTS（别名）
+  GSV <文本> - 手动触发 TTS（别名）
+  重启GSV - 重启 GPT-SoVITS
+
+  配置说明：
+  - client.base_url: GPT-SoVITS API 地址
+  - default_params.ref_audio_path: 参考音频路径
+  - enabled: 总开关
+version: v1.0.0
+author: 灵犀
+repo: https://github.com/gongzhudeng/astrbot_plugin_lingxi_gpt_sovits
