@@ -47,9 +47,19 @@ class EntryManager:
         try:
             with file.open("r", encoding="utf-8") as f:
                 data: list[dict[str, Any]] = yaml.safe_load(f) or []
-                self.add_entry(data)
+                self._inject_builtin(data)
         except Exception as e:
             logger.error(e)
+
+    def _inject_builtin(self, data: list[dict[str, Any]], key: str = "name") -> None:
+        """Inject builtin entries into memory only; never write back to config.
+        Skipped entirely if the user already has custom entries configured."""
+        if self.entries:
+            return
+        for item in data:
+            if key not in item:
+                continue
+            self.entries.append(EmotionEntry(item))
 
     def add_entry(self, data: list[dict[str, Any]], key="name") -> None:
         existed = {e.name for e in self.entries}

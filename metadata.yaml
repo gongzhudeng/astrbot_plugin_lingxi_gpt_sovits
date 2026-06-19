@@ -27,6 +27,6 @@ help: |
   - client.base_url: GPT-SoVITS API 地址
   - default_params.ref_audio_path: 参考音频路径
   - enabled: 总开关
-version: v1.1.3
+version: v1.1.4
 author: 灵犀
 repo: https://github.com/gongzhudeng/astrbot_plugin_lingxi_gpt_sovits
