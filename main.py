@@ -1,5 +1,8 @@
 import base64
+import io
+import re
 import random
+import wave
 
 from astrbot.api import logger
 from astrbot.api.event import filter
@@ -7,6 +10,34 @@ from astrbot.api.star import Context, Star
 from astrbot.core import AstrBotConfig
 from astrbot.core.message.components import Plain, Record
 from astrbot.core.platform import AstrMessageEvent
+
+_PUNCT_RE = re.compile(r"([^，。！？,!?.…]+[，。！？,!?.…]?)")
+
+
+def _split_by_punctuation(text: str) -> list[str]:
+    return [s.strip() for s in _PUNCT_RE.findall(text) if s.strip()]
+
+
+def _split_by_sentence(text: str, group_size: int) -> list[str]:
+    sentences = [s.strip() for s in re.split(r"[。.]", text) if s.strip()]
+    return [
+        "。".join(sentences[i : i + group_size])
+        for i in range(0, len(sentences), group_size)
+    ]
+
+
+def _merge_wav_bytes(chunks: list[bytes]) -> bytes:
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as out_wav:
+        params_set = False
+        for chunk in chunks:
+            with wave.open(io.BytesIO(chunk), "rb") as in_wav:
+                if not params_set:
+                    out_wav.setparams(in_wav.getparams())
+                    params_set = True
+                out_wav.writeframes(in_wav.readframes(in_wav.getnframes()))
+    return buf.getvalue()
+
 
 from .core.client import GSVApiClient, GSVRequestResult
 from .core.config import PluginConfig
@@ -98,6 +129,40 @@ class GPTSoVITSPlugin(Star):
 
         return entry.to_params() if entry else None
 
+    async def _infer_with_emotion(
+        self, event: AstrMessageEvent, text: str
+    ) -> GSVRequestResult | None:
+        """按情绪计算范围推理，返回结果；分段模式下合并 WAV，失败降级整段。"""
+        scope = getattr(self.cfg.judge, "emotion_scope", "whole")
+        media_type = self.cfg.default_params.get("media_type", "wav")
+
+        if scope != "whole" and media_type == "wav":
+            if scope == "punctuation":
+                segments = _split_by_punctuation(text) or [text]
+            else:
+                group_size = getattr(self.cfg.judge, "sentence_group_size", 1)
+                segments = _split_by_sentence(text, group_size) or [text]
+
+            chunks: list[bytes] = []
+            for seg in segments:
+                event.set_extra("emotion", None)  # clear cache per segment
+                params = await self._get_emotion_params(event, seg)
+                res = await self.service.inference(seg, extra_params=params)
+                if not bool(res) or not res.data:
+                    return res
+                chunks.append(res.data)
+
+            try:
+                merged = _merge_wav_bytes(chunks)
+                b64 = base64.urlsafe_b64encode(merged).decode()
+                # Return a synthetic result carrying the merged audio
+                return GSVRequestResult(ok=True, data=merged, text=text, file_path="")
+            except Exception as e:
+                logger.warning(f"WAV 合并失败，降级整段推理: {e}")
+
+        params = await self._get_emotion_params(event, text)
+        return await self.service.inference(text, extra_params=params)
+
     @filter.on_decorating_result(priority=14)
     async def on_decorating_result(self, event: AstrMessageEvent):
         """消息入口"""
@@ -129,8 +194,7 @@ class GPTSoVITSPlugin(Star):
         if len(combined_text) > cfg.max_msg_len:
             return
 
-        params = await self._get_emotion_params(event, combined_text)
-        res = await self.service.inference(combined_text, extra_params=params)
+        res = await self._infer_with_emotion(event, combined_text)
         if not bool(res):
             return
         chain.clear()
@@ -143,7 +207,7 @@ class GPTSoVITSPlugin(Star):
             return
 
         text = event.message_str.partition(" ")[2]
-        res = await self.service.inference(text)
+        res = await self._infer_with_emotion(event, text)
 
         if not bool(res):
             yield event.plain_result(res.error)

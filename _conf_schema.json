@@ -306,6 +306,21 @@
                 "default": "",
                 "hint": "留空或者填写的提供商不存在时, 则使用当前正在使用的LLM提供商。 tip:工作较为简单，建议用稳定便宜又快速的小模型",
                 "_special": "select_provider"
+            },
+            "emotion_scope": {
+                "description": "情绪计算范围",
+                "type": "string",
+                "hint": "决定对哪个粒度的文本计算情绪。按标点/句子模式仅支持 WAV 格式，其他格式自动降级为整段",
+                "options": ["whole", "punctuation", "sentence"],
+                "labels": ["整段话", "按标点切割（每段独立情绪）", "按句子分组（句号为句）"],
+                "default": "whole"
+            },
+            "sentence_group_size": {
+                "description": "句子分组大小",
+                "type": "int",
+                "hint": "仅在「按句子分组」模式下生效，每 N 句为一组计算情绪",
+                "slider": {"min": 1, "max": 10, "step": 1},
+                "default": 1
             }
         }
     },

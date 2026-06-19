@@ -108,6 +108,7 @@ class LocalDataManager:
                     logger.debug(f"文件已存在，跳过覆盖: {path}")
                     return path
 
+            path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(data)
 
             logger.info(f"已保存音频文件: {path}")
