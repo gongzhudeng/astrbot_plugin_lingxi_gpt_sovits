@@ -147,7 +147,7 @@ class PluginConfig(ConfigNode):
     entry_storage: list[dict[str, Any]]
     active_profile: str
 
-    _plugin_name: str = "astrbot_plugin_GPT_SoVITS"
+    _plugin_name: str = "astrbot_plugin_lingxi_gpt_sovits"
 
     def __init__(self, cfg: AstrBotConfig, context: Context):
         super().__init__(cfg)
