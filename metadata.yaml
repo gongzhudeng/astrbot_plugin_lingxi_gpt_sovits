@@ -14,14 +14,19 @@ help: |
 
   常用命令：
   说 <文本> - 手动触发 TTS
+  说 <情绪> <文本> - 指定情绪触发 TTS（跳过自动情绪判断，例：说 开心 你好）
   gsv <文本> - 手动触发 TTS（别名）
   GSV <文本> - 手动触发 TTS（别名）
+  语音角色 - 列出所有已保存角色
+  语音角色 <序号/名称> - 切换到指定角色
+  保存角色 <名称> - 将当前配置保存为角色
+  删除角色 <序号/名称> - 删除指定角色
   重启GSV - 重启 GPT-SoVITS
 
   配置说明：
   - client.base_url: GPT-SoVITS API 地址
   - default_params.ref_audio_path: 参考音频路径
   - enabled: 总开关
-version: v1.1.2
+version: v1.1.3
 author: 灵犀
 repo: https://github.com/gongzhudeng/astrbot_plugin_lingxi_gpt_sovits

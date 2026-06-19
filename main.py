@@ -200,12 +200,20 @@ class GPTSoVITSPlugin(Star):
 
     @filter.command("说", alias={"gsv", "GSV"})
     async def on_command(self, event: AstrMessageEvent):
-        """说 <内容>，直接调用GSV合成语音"""
+        """说 [情绪] <内容>，直接调用GSV合成语音；可选情绪名强制指定情绪"""
         if not self.cfg.enabled:
             return
 
-        text = event.message_str.partition(" ")[2]
-        res = await self._infer_with_emotion(event, text)
+        body = event.message_str.partition(" ")[2]
+        first, _, rest = body.partition(" ")
+        forced_entry = self.entry_mgr.get_entry(first) if first else None
+
+        if forced_entry and rest:
+            text = rest
+            res = await self.service.inference(text, extra_params=forced_entry.to_params())
+        else:
+            text = body
+            res = await self._infer_with_emotion(event, text)
 
         if not bool(res):
             yield event.plain_result(res.error)
