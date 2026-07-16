@@ -185,7 +185,8 @@
                     "cut2",
                     "cut3",
                     "cut4",
-                    "cut5"
+                    "cut5",
+                    "custom"
                 ],
                 "labels": [
                     "不切分",
@@ -193,9 +194,19 @@
                     "50字一切",
                     "按中文句号切",
                     "按英文句号切",
-                    "按标点符号切"
+                    "按标点符号切",
+                    "自定义符号"
                 ],
                 "default": "cut3"
+            },
+            "custom_split_symbols": {
+                "description": "自定义切分符号",
+                "type": "string",
+                "hint": "每个字符都作为独立切分符；可用 \\n 表示换行。原文中的真实换行始终是切分边界",
+                "default": "，。！？\\n",
+                "condition": {
+                    "text_split_method": "custom"
+                }
             },
             "batch_size": {
                 "description": "推理批大小",
@@ -297,7 +308,13 @@
             "enabled_llm": {
                 "description": "使用 LLM 判断情感",
                 "type": "bool",
-                "hint": "开启后，将使用 LLM 模型判断当前文本的情绪，从而改变语音的情绪参数。若关闭， 则使用情绪条目的触发词来匹配情绪",
+                "hint": "开启后，将使用 LLM 模型判断当前文本的情绪，从而改变语音的情绪参数。若关闭，则使用情绪条目的触发词来匹配情绪",
+                "default": false
+            },
+            "keyword_overrides_llm": {
+                "description": "关键词覆盖 LLM",
+                "type": "bool",
+                "hint": "关闭时保持现有逻辑，优先使用 LLM 判断，未命中时再匹配关键词；开启后优先匹配关键词，命中则不调用 LLM，未命中才调用 LLM",
                 "default": false
             },
             "provider_id": {

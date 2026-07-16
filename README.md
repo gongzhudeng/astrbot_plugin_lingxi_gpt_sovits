@@ -146,12 +146,16 @@ python3 api_v2.py
 | `fragment_interval` | 语句片段间隔（秒） | 值越小节奏越紧凑 |
 | `media_type` | 输出音频格式 | `wav/mp3/ogg`（建议 `wav`） |
 | `text_split_method` / `batch_size` / `parallel_infer` 等 | 长文本和性能相关参数 | 按显存与效果微调 |
+| `custom_split_symbols` | 自定义切分符号，仅在“自定义符号”模式生效 | 每个字符独立生效，支持用 `\n` 表示换行；原文真实换行始终会切分 |
+
+“自定义符号”模式由插件先将命中的符号转换为换行边界，再使用 GPT-SoVITS 的 `cut0` 处理。切分符会保留在上一段末尾，以维持原有语气和停顿。
 
 ### 6.4 情绪判别配置（`judge` + `entry_storage`）
 
 | 字段 | 说明 | 建议/取值 |
 | --- | --- | --- |
 | `judge.enabled_llm` | 是否启用 LLM 判别情绪 | 不开则仅走关键词匹配 |
+| `judge.keyword_overrides_llm` | 关键词是否覆盖 LLM | 默认关闭：LLM 优先、关键词兜底；开启：关键词优先，命中后不调用 LLM |
 | `judge.provider_id` | 用于情绪判别的模型提供商 ID | 留空时跟随当前会话模型 |
 | `entry_storage[].name` | 情绪名称 | 建议唯一，便于识别 |
 | `entry_storage[].keywords` | 触发关键词列表 | 文本包含任一关键词即命中 |

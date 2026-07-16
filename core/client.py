@@ -29,7 +29,6 @@ class GSVRequestResult:
         return self.ok and not self.is_empty
 
 
-
 class GSVApiClient:
     """
     API 层（HTTP 通信）

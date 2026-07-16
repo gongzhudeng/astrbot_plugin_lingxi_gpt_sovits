@@ -5,6 +5,7 @@ from astrbot.api import logger
 from .client import GSVApiClient, GSVRequestResult
 from .config import PluginConfig
 from .local_data import LocalDataManager
+from .text_split import split_text_with_symbols
 
 
 class GPTSoVITSService:
@@ -40,17 +41,33 @@ class GPTSoVITSService:
             else:
                 logger.error(f"SoVITS 模型加载失败: {result.error}")
 
+    def prepare_params(
+        self,
+        text: str,
+        extra_params: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        params = self.default_params.copy()
+        if text:
+            params["text"] = text
+        if extra_params:
+            params.update({k: v for k, v in extra_params.items() if k in params})
+
+        custom_symbols = str(params.pop("custom_split_symbols", ""))
+        if params.get("text_split_method") == "custom":
+            params["text"] = split_text_with_symbols(
+                str(params.get("text", "")), custom_symbols
+            )
+            params["text_split_method"] = "cut0"
+
+        return params
+
     async def inference_raw(
         self,
         text: str,
         extra_params: dict[str, Any] | None = None,
     ) -> GSVRequestResult:
         """TTS inference without cache read/write (used for segment merging)."""
-        params = self.default_params.copy()
-        if text:
-            params["text"] = text
-        if extra_params:
-            params.update({k: v for k, v in extra_params.items() if k in params})
+        params = self.prepare_params(text, extra_params)
         logger.debug(f"向 GSV 发起 TTS 请求（无缓存），参数: {params}")
         return await self.client.tts(params)
 
@@ -60,15 +77,12 @@ class GPTSoVITSService:
         extra_params: dict[str, Any] | None = None,
     ) -> GSVRequestResult:
         """TTS 推理"""
-        params = self.default_params.copy()
-        if text:
-            params["text"] = text
+        params = self.prepare_params(text, extra_params)
 
         if extra_params:
             filtered_params = {
-                k: v for k, v in extra_params.items() if k in params
+                k: v for k, v in extra_params.items() if k in self.default_params
             }
-            params.update(filtered_params)
             logger.debug(f"已更新已有参数: {filtered_params}")
 
         cached_audio = self.local_data.get_cached_audio(params)

@@ -1,7 +1,7 @@
 import base64
 import io
-import re
 import random
+import re
 import wave
 
 from astrbot.api import logger
@@ -10,6 +10,14 @@ from astrbot.api.star import Context, Star
 from astrbot.core import AstrBotConfig
 from astrbot.core.message.components import Plain, Record
 from astrbot.core.platform import AstrMessageEvent
+
+from .core.client import GSVApiClient, GSVRequestResult
+from .core.config import PluginConfig
+from .core.emotion import EmotionJudger
+from .core.entry import EntryManager
+from .core.local_data import LocalDataManager
+from .core.profile_manager import ProfileManager
+from .core.service import GPTSoVITSService
 
 _PUNCT_RE = re.compile(r"([^，。！？,!?.…]+[，。！？,!?.…]?)")
 
@@ -37,15 +45,6 @@ def _merge_wav_bytes(chunks: list[bytes]) -> bytes:
                     params_set = True
                 out_wav.writeframes(in_wav.readframes(in_wav.getnframes()))
     return buf.getvalue()
-
-
-from .core.client import GSVApiClient, GSVRequestResult
-from .core.config import PluginConfig
-from .core.emotion import EmotionJudger
-from .core.entry import EntryManager
-from .core.local_data import LocalDataManager
-from .core.profile_manager import ProfileManager
-from .core.service import GPTSoVITSService
 
 
 class GPTSoVITSPlugin(Star):
@@ -115,15 +114,25 @@ class GPTSoVITSPlugin(Star):
         self, event: AstrMessageEvent, text: str
     ) -> dict | None:
         entry = None
+        keyword_overrides_llm = bool(self.cfg.judge.keyword_overrides_llm)
 
-        if self.cfg.judge.enabled_llm:
+        if keyword_overrides_llm:
+            entry = self.entry_mgr.match_entry(text)
+            if entry:
+                logger.debug(f"关键词优先命中情绪: {entry.name}")
+
+        if entry is None and self.cfg.judge.enabled_llm:
             labels = self.entry_mgr.get_names()
             emotion = await self.judger.judge_emotion(event, text=text, labels=labels)
             if emotion:
                 entry = self.entry_mgr.get_entry(emotion)
+                if entry:
+                    logger.debug(f"LLM 命中情绪: {entry.name}")
 
-        if entry is None:
+        if entry is None and not keyword_overrides_llm:
             entry = self.entry_mgr.match_entry(text)
+            if entry:
+                logger.debug(f"关键词兜底命中情绪: {entry.name}")
 
         return entry.to_params() if entry else None
 
@@ -152,7 +161,7 @@ class GPTSoVITSPlugin(Star):
 
             try:
                 merged = _merge_wav_bytes(chunks)
-                cache_params = {**self.service.default_params, "text": text}
+                cache_params = self.service.prepare_params(text)
                 cache_path = self.local_data.save_audio(merged, cache_params)
                 return GSVRequestResult(
                     ok=True,
@@ -215,7 +224,9 @@ class GPTSoVITSPlugin(Star):
 
         if forced_entry and rest:
             text = rest
-            res = await self.service.inference(text, extra_params=forced_entry.to_params())
+            res = await self.service.inference(
+                text, extra_params=forced_entry.to_params()
+            )
         else:
             text = body
             res = await self._infer_with_emotion(event, text)
@@ -288,7 +299,9 @@ class GPTSoVITSPlugin(Star):
         if not arg:
             names = self.profile_mgr.list_profiles()
             if not names:
-                yield event.plain_result("还没有保存的角色。使用「保存角色 名称」来创建一个。")
+                yield event.plain_result(
+                    "还没有保存的角色。使用「保存角色 名称」来创建一个。"
+                )
                 return
 
             lines = ["语音角色列表："]
@@ -320,7 +333,9 @@ class GPTSoVITSPlugin(Star):
 
         arg = event.message_str.partition(" ")[2].strip()
         if not arg:
-            yield event.plain_result("请指定角色序号或名称，例如：删除角色 2 或 删除角色 我的角色")
+            yield event.plain_result(
+                "请指定角色序号或名称，例如：删除角色 2 或 删除角色 我的角色"
+            )
             return
 
         name, err = self._resolve_profile_name(arg)

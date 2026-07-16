@@ -36,7 +36,7 @@ class EmotionJudger:
             - 成功时返回情感标签字符串
             - 失败时返回 None
         """
-        if cached:= event.get_extra("emotion"):
+        if cached := event.get_extra("emotion"):
             if (labels and cached in labels) or (not labels):
                 logger.debug(f"复用情感标签: {cached}")
                 return cached

@@ -127,6 +127,7 @@ class ModelConfig(ConfigNode):
 
 class JudgeConfig(ConfigNode):
     enabled_llm: bool
+    keyword_overrides_llm: bool
     provider_id: str
     emotion_scope: str  # "whole" | "punctuation" | "sentence"
     sentence_group_size: int
