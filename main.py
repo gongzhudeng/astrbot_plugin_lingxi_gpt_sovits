@@ -1,11 +1,14 @@
 import base64
+import html
 import io
 import random
 import re
 import wave
+from dataclasses import dataclass
 
 from astrbot.api import logger
 from astrbot.api.event import filter
+from astrbot.api.provider import LLMResponse
 from astrbot.api.star import Context, Star
 from astrbot.core import AstrBotConfig
 from astrbot.core.message.components import Plain, Record
@@ -20,6 +23,78 @@ from .core.profile_manager import ProfileManager
 from .core.service import GPTSoVITSService
 
 _PUNCT_RE = re.compile(r"([^，。！？,!?.…]+[，。！？,!?.…]?)")
+_PSEUDO_TTS_BLOCK_RE = re.compile(
+    r"(?P<block>(?:"
+    r"<gsv_tts\b[^>]*>\s*(?:"
+    r"<invoke\b(?=[^>]*\bname\s*=\s*(?:\"gsv_tts\"|'gsv_tts'))[^>]*>"
+    r"[\s\S]*?</invoke>\s*"
+    r")?</gsv_tts>"
+    r"|"
+    r"<invoke\b(?=[^>]*\bname\s*=\s*(?:\"gsv_tts\"|'gsv_tts'))[^>]*>"
+    r"[\s\S]*?</invoke>"
+    r"))\s*$",
+    re.IGNORECASE,
+)
+_PARAMETER_RE = re.compile(
+    r"<parameter\b(?P<attrs>[^>]*)>(?P<body>[\s\S]*?)</parameter>",
+    re.IGNORECASE,
+)
+_MESSAGE_ATTR_RE = re.compile(
+    r"\bmessage\s*=\s*(?P<quote>['\"])(?P<value>[\s\S]*?)(?P=quote)",
+    re.IGNORECASE,
+)
+_NAME_MESSAGE_RE = re.compile(
+    r"\bname\s*=\s*(['\"])message\1",
+    re.IGNORECASE,
+)
+_INVOKE_BODY_RE = re.compile(
+    r"<invoke\b[^>]*>(?P<body>[\s\S]*?)</invoke>",
+    re.IGNORECASE,
+)
+_TAG_RE = re.compile(r"<[^>]+>")
+_PSEUDO_TTS_TEXT_KEY = "_gsv_pseudo_tts_text"
+_PSEUDO_TTS_RECOVERY_KEY = "_gsv_pseudo_tts_recovery"
+
+
+@dataclass(frozen=True)
+class PseudoTTSCall:
+    display_text: str
+    tts_text: str
+    matched: bool
+
+
+def _plain_xml_text(value: str) -> str:
+    return html.unescape(_TAG_RE.sub("", value)).strip()
+
+
+def _extract_pseudo_tts_message(block: str) -> str:
+    for match in _PARAMETER_RE.finditer(block):
+        if _NAME_MESSAGE_RE.search(match.group("attrs")):
+            return _plain_xml_text(match.group("body"))
+
+    invoke_match = _INVOKE_BODY_RE.search(block)
+    if not invoke_match:
+        return ""
+
+    invoke_body = invoke_match.group("body")
+    attr_match = _MESSAGE_ATTR_RE.search(invoke_body)
+    if attr_match:
+        return html.unescape(attr_match.group("value")).strip()
+    return _plain_xml_text(invoke_body)
+
+
+def _parse_pseudo_tts_call(text: str) -> PseudoTTSCall:
+    match = _PSEUDO_TTS_BLOCK_RE.search(text)
+    if not match:
+        return PseudoTTSCall(display_text=text, tts_text="", matched=False)
+
+    display_text = text[: match.start()].rstrip()
+    message = _extract_pseudo_tts_message(match.group("block"))
+    return PseudoTTSCall(
+        display_text=display_text,
+        tts_text=message or display_text,
+        matched=True,
+    )
 
 
 def _split_by_punctuation(text: str) -> list[str]:
@@ -175,22 +250,37 @@ class GPTSoVITSPlugin(Star):
         params = await self._get_emotion_params(event, text)
         return await self.service.inference(text, extra_params=params)
 
+    @filter.on_llm_response(priority=100)
+    async def recover_pseudo_tts_call(self, event: AstrMessageEvent, resp: LLMResponse):
+        if not self.cfg.enabled or resp.role != "assistant" or resp.tools_call_name:
+            return
+
+        parsed = _parse_pseudo_tts_call(resp.completion_text or "")
+        if not parsed.matched:
+            return
+
+        resp.completion_text = parsed.display_text
+        event.set_extra(_PSEUDO_TTS_TEXT_KEY, parsed.tts_text)
+        event.set_extra(_PSEUDO_TTS_RECOVERY_KEY, True)
+        logger.info("检测到文本形式的 gsv_tts 调用，已清洗并恢复语音输出")
+
     @filter.on_decorating_result(priority=14)
     async def on_decorating_result(self, event: AstrMessageEvent):
         """消息入口"""
         if not self.cfg.enabled:
             return
         cfg = self.cfg.auto
+        recovery = bool(event.get_extra(_PSEUDO_TTS_RECOVERY_KEY, False))
 
         result = event.get_result()
         if not result:
             return
         chain = result.chain
-        if not chain:
+        if not chain and not recovery:
             return
         if cfg.only_llm_result and not result.is_llm_result():
             return
-        if random.random() > cfg.tts_prob:
+        if not recovery and random.random() > cfg.tts_prob:
             return
 
         plain_texts = []
@@ -201,15 +291,22 @@ class GPTSoVITSPlugin(Star):
         if len(plain_texts) != len(chain):
             return
 
-        combined_text = "\n".join(plain_texts)
-
-        if len(combined_text) > cfg.max_msg_len:
+        display_text = "\n".join(plain_texts).strip()
+        tts_text = (
+            str(event.get_extra(_PSEUDO_TTS_TEXT_KEY, "")).strip()
+            if recovery
+            else display_text
+        )
+        if not tts_text or len(tts_text) > cfg.max_msg_len:
             return
 
-        res = await self._infer_with_emotion(event, combined_text)
+        res = await self._infer_with_emotion(event, tts_text)
         if not bool(res):
             return
+
         chain.clear()
+        if recovery and display_text and display_text != tts_text:
+            chain.append(Plain(display_text))
         chain.append(self._to_record(res))
 
     @filter.command("说", alias={"gsv", "GSV"})
