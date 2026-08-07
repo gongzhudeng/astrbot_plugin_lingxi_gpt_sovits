@@ -46,9 +46,12 @@ class GPTSoVITSService:
         text: str,
         extra_params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        normalized_text = str(text or "").strip()
+        if not normalized_text:
+            raise ValueError("TTS 文本不能为空")
+
         params = self.default_params.copy()
-        if text:
-            params["text"] = text
+        params["text"] = normalized_text
         if extra_params:
             params.update({k: v for k, v in extra_params.items() if k in params})
 

@@ -315,12 +315,16 @@ class GPTSoVITSPlugin(Star):
         if not self.cfg.enabled:
             return
 
-        body = event.message_str.partition(" ")[2]
+        body = event.message_str.partition(" ")[2].strip()
+        if not body:
+            yield event.plain_result("请输入要合成的文本")
+            return
+
         first, _, rest = body.partition(" ")
         forced_entry = self.entry_mgr.get_entry(first) if first else None
 
-        if forced_entry and rest:
-            text = rest
+        if forced_entry and rest.strip():
+            text = rest.strip()
             res = await self.service.inference(
                 text, extra_params=forced_entry.to_params()
             )
@@ -457,6 +461,10 @@ class GPTSoVITSPlugin(Star):
         Args:
             message(string): 要讲的话
         """
+        if not isinstance(message, str) or not message.strip():
+            return "语音文本不能为空"
+
+        message = message.strip()
         try:
             params = await self._get_emotion_params(event, message)
             res = await self.service.inference(message, extra_params=params)
