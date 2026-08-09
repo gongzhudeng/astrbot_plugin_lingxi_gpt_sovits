@@ -3,6 +3,7 @@ import html
 import io
 import random
 import re
+import uuid
 import wave
 from dataclasses import dataclass
 
@@ -47,6 +48,8 @@ _NAME_MESSAGE_RE = re.compile(
     r"\bname\s*=\s*(['\"])message\1",
     re.IGNORECASE,
 )
+_DIRECT_DELIVERY_TEXT_EXTRA = "spark_direct_delivery_history_text"
+_DIRECT_DELIVERY_KIND_EXTRA = "spark_direct_delivery_kind"
 _INVOKE_BODY_RE = re.compile(
     r"<invoke\b[^>]*>(?P<body>[\s\S]*?)</invoke>",
     re.IGNORECASE,
@@ -120,6 +123,15 @@ def _merge_wav_bytes(chunks: list[bytes]) -> bytes:
                     params_set = True
                 out_wav.writeframes(in_wav.readframes(in_wav.getnframes()))
     return buf.getvalue()
+
+
+def _resolve_busy_schedule_media_recorder(event, context):
+    """Resolve the recorder from the tool event, then the shared plugin context."""
+    callback = getattr(event, "_busy_schedule_record_media_success", None)
+    if callable(callback):
+        return callback
+    callback = getattr(context, "_busy_schedule_record_media_success", None)
+    return callback if callable(callback) else None
 
 
 class GPTSoVITSPlugin(Star):
@@ -454,6 +466,9 @@ class GPTSoVITSPlugin(Star):
 
     # ======================== LLM 工具 ========================
 
+    def _get_busy_schedule_media_recorder(self, event: AstrMessageEvent):
+        return _resolve_busy_schedule_media_recorder(event, self.context)
+
     @filter.llm_tool()
     async def gsv_tts(self, event: AstrMessageEvent, message: str = ""):
         """
@@ -472,5 +487,19 @@ class GPTSoVITSPlugin(Star):
                 return res.error
             seg = self._to_record(res)
             await event.send(event.chain_result([seg]))
+            event.set_extra(_DIRECT_DELIVERY_TEXT_EXTRA, message)
+            event.set_extra(_DIRECT_DELIVERY_KIND_EXTRA, "voice")
+            callback = self._get_busy_schedule_media_recorder(event)
+            if callable(callback):
+                try:
+                    callback(
+                        event.unified_msg_origin,
+                        {"voice"},
+                        operation_id=f"voice:{event.unified_msg_origin}:{uuid.uuid4().hex}",
+                    )
+                except Exception as exc:
+                    logger.warning("记录忙碌执行记录失败: %s", exc)
+            else:
+                logger.debug("BusySchedule media recorder is unavailable")
         except Exception as e:
             return str(e)
