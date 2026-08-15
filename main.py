@@ -350,6 +350,35 @@ class GPTSoVITSPlugin(Star):
 
         yield event.chain_result([self._to_record(res)])
 
+    @filter.command("语音概率", alias={"tts_probability"})
+    @filter.permission_type(filter.PermissionType.ADMIN)
+    async def set_tts_probability(self, event: AstrMessageEvent):
+        """查看或设置主动转语音发送的概率。"""
+        if not self.cfg.enabled:
+            return
+
+        arg = event.message_str.partition(" ")[2].strip()
+        if not arg:
+            yield event.plain_result(
+                f"当前主动转语音概率：{self.cfg.auto.tts_prob:g}。"
+                "用法：语音概率 <0 到 1>"
+            )
+            return
+
+        try:
+            probability = float(arg)
+        except ValueError:
+            yield event.plain_result("概率必须是 0 到 1 之间的数字")
+            return
+
+        if not 0 <= probability <= 1:
+            yield event.plain_result("概率必须在 0 到 1 之间")
+            return
+
+        self.cfg.auto.tts_prob = probability
+        self.cfg.save_config()
+        yield event.plain_result(f"已将主动转语音概率设置为：{probability:g}")
+
     @filter.command("重启GSV", alias={"重启gsv"})
     async def tts_control(self, event: AstrMessageEvent):
         """重启GPT_SoVITS"""
@@ -472,7 +501,9 @@ class GPTSoVITSPlugin(Star):
     @filter.llm_tool()
     async def gsv_tts(self, event: AstrMessageEvent, message: str = ""):
         """
-        用语音输出要讲的话
+        用语音输出要讲的话。
+        当用户明确希望听到你的声音、要求发送语音，或语音表达更符合需求时使用。
+        message 仅填写需要合成的内容。
         Args:
             message(string): 要讲的话
         """

@@ -88,6 +88,7 @@ python3 api_v2.py
 | 命令 | 别名 | 说明 |
 | ----- | ----- | ----- |
 | `说 <文本>` | `gsv <文本>`、`GSV <文本>` | 手动触发 TTS。启用缓存时，同参数请求会优先复用本地音频 |
+| `语音概率 [0~1]` | `tts_probability [0~1]` | 查看或设置自动转语音概率。此命令仅管理员可用 |
 | 概率调用（无命令） | - | Bot 回复阶段按概率自动转语音。触发条件：插件启用、命中概率、消息链全为纯文本、文本长度不超过最大长度 |
 | 工具调用（无命令） | LLM Tool | 供模型工具调用的 TTS 接口，由 bot 自行决定是否需要转语音 |
 | `重启GSV` | `重启gsv` | 请求 GPT-SoVITS 执行重启 |
@@ -157,6 +158,7 @@ python3 api_v2.py
 | `judge.enabled_llm` | 是否启用 LLM 判别情绪 | 不开则仅走关键词匹配 |
 | `judge.keyword_overrides_llm` | 关键词是否覆盖 LLM | 默认关闭：LLM 优先、关键词兜底；开启：关键词优先，命中后不调用 LLM |
 | `judge.provider_id` | 用于情绪判别的模型提供商 ID | 留空时跟随当前会话模型 |
+| `entry_storage[].enabled` | 是否启用该情绪 | 关闭后保留参数，但不参与关键词匹配、LLM 判别或手动指定 |
 | `entry_storage[].name` | 情绪名称 | 建议唯一，便于识别 |
 | `entry_storage[].keywords` | 触发关键词列表 | 文本包含任一关键词即命中 |
 | `entry_storage[].ref_audio_path` | 该情绪使用的参考音频 | 可与默认参考音频不同 |

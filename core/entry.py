@@ -23,6 +23,10 @@ class EmotionEntry(ConfigNode):
         super().__init__(data)
         self.ref_audio_path = PluginConfig.normalize_path(self.ref_audio_path)
 
+    @property
+    def is_enabled(self) -> bool:
+        return self._data.get("enabled", True) is not False
+
     def to_params(self) -> dict[str, Any]:
         return {
             "ref_audio_path": self.ref_audio_path,
@@ -77,18 +81,20 @@ class EntryManager:
             logger.info(f"已加载提示词：{[item[key] for item in new_items]}")
 
     def get_names(self) -> list[str]:
-        """获取所有条目名称"""
-        return [entry.name for entry in self.entries]
+        """获取所有已启用条目名称"""
+        return [entry.name for entry in self.entries if entry.is_enabled]
 
     def get_entry(self, name: str) -> EmotionEntry | None:
-        """获取条目"""
+        """获取已启用条目"""
         for entry in self.entries:
-            if entry.name == name:
+            if entry.name == name and entry.is_enabled:
                 return entry
 
     def match_entry(self, message: str) -> EmotionEntry | None:
-        """匹配条目"""
+        """匹配已启用条目"""
         for entry in self.entries:
+            if not entry.is_enabled:
+                continue
             for keyword in entry.keywords:
                 if keyword in message:
                     return entry

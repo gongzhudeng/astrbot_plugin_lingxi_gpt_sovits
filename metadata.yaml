@@ -21,12 +21,14 @@ help: |
   语音角色 <序号/名称> - 切换到指定角色
   保存角色 <名称> - 将当前配置保存为角色
   删除角色 <序号/名称> - 删除指定角色
+  语音概率 [0~1] - 查看或设置自动转语音概率（仅管理员可用）
+  tts_probability [0~1] - 查看或设置自动转语音概率（仅管理员可用）
   重启GSV - 重启 GPT-SoVITS
 
   配置说明：
   - client.base_url: GPT-SoVITS API 地址
   - default_params.ref_audio_path: 参考音频路径
   - enabled: 总开关
-version: v1.2.3
+version: v1.2.4
 author: 灵犀
 repo: https://github.com/gongzhudeng/astrbot_plugin_lingxi_gpt_sovits

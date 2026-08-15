@@ -379,6 +379,12 @@
             "default": {
                 "name": "情绪条目",
                 "items": {
+                    "enabled": {
+                        "description": "启用此情绪",
+                        "type": "bool",
+                        "hint": "关闭后保留参数，但不会参与关键词匹配、LLM 判断或手动指定",
+                        "default": true
+                    },
                     "name": {
                         "description": "情绪名",
                         "type": "string",
